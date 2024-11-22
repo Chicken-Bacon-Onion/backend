@@ -1,5 +1,10 @@
 from django.db import models
 
-class LargeImage(models.Model):
-    image = models.ImageField(upload_to='large_images/')
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+class UploadedImage(models.Model):
+    image = models.ImageField(upload_to='images/')
+    upload_time = models.DateTimeField(auto_now_add=True)
+    source = models.CharField(max_length=255, blank=True)
+    format = models.CharField(max_length=10, blank=True)
+
+    def __str__(self):
+        return f"{self.image.name} uploaded at {self.upload_time}"
