@@ -30,6 +30,9 @@ class UploadedImage(models.Model):
             # Use the deepzoom library to create tiles
             creator = deepzoom.ImageCreator(tile_size=tile_size, tile_overlap=0, tile_format="png")
             creator.create(input_path, str(output_dir))
+            img = Image.open(output_dir)
+            img.convert("P", palette=Image.ADAPTIVE, colors=256)
+            img.save(output_dir, optimize=True)
 
         except Exception as e:
             raise RuntimeError(f"Error generating tiles for image {self.id}: {e}")
