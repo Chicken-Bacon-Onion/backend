@@ -1,14 +1,37 @@
 import os
 from PIL import Image
 import math
-
+import multiprocessing
 
 Image.MAX_IMAGE_PIXELS = None
 
 
+def generate_tile(image, output_dir, x, y, tile_size=256):
+    """
+    Generate a single tile from the image.
+
+    Args:
+        image (PIL.Image): The input image object.
+        output_dir (str): Directory to save the tile.
+        x (int): The x index of the tile.
+        y (int): The y index of the tile.
+        tile_size (int): Size of each tile (default: 256).
+    """
+    width, height = image.size
+    left = x * tile_size
+    upper = y * tile_size
+    right = min((x + 1) * tile_size, width)
+    lower = min((y + 1) * tile_size, height)
+
+    tile = image.crop((left, upper, right, lower))
+    tile_path = os.path.join(output_dir, f"{y}_{x}.png")
+    tile.convert("P", palette=Image.ADAPTIVE, colors=256)
+    tile.save(tile_path, "PNG", optimize=True)
+
+
 def generate_tiles(image_path, output_dir, tile_size=256):
     """
-    Generate Deep Zoom tiles for the given image.
+    Generate Deep Zoom tiles for the given image with multiprocessing.
 
     Args:
         image_path (str): Path to the input image.
@@ -22,38 +45,17 @@ def generate_tiles(image_path, output_dir, tile_size=256):
     # Create the output directory
     os.makedirs(output_dir, exist_ok=True)
 
-    # Determine the number of zoom levels
-    max_dimension = max(width, height)
-    num_levels = math.ceil(math.log2(max_dimension / tile_size))
+    num_tiles_x = math.ceil(width / tile_size)
+    num_tiles_y = math.ceil(height / tile_size)
 
-    # Generate tiles for each zoom level
-    for level in range(num_levels + 1):
-        scale = 2 ** level
-        resized_width = math.ceil(width / scale)
-        resized_height = math.ceil(height / scale)
+    # Prepare arguments for each tile to be processed
+    tasks = []
+    for x in range(num_tiles_x):
+        for y in range(num_tiles_y):
+            tasks.append((image, output_dir, x, y, tile_size))
 
-        # Resize the image for the current zoom level
-        resized_image = image.resize(
-            (resized_width, resized_height),
-            resample=Image.Resampling.LANCZOS  # Use LANCZOS for high-quality downsampling
-        )
-
-        # Create tiles for the current zoom level
-        level_dir = os.path.join(output_dir, f"level_{level}")
-        os.makedirs(level_dir, exist_ok=True)
-
-        num_tiles_x = math.ceil(resized_width / tile_size)
-        num_tiles_y = math.ceil(resized_height / tile_size)
-
-        for x in range(num_tiles_x):
-            for y in range(num_tiles_y):
-                left = x * tile_size
-                upper = y * tile_size
-                right = min((x + 1) * tile_size, resized_width)
-                lower = min((y + 1) * tile_size, resized_height)
-
-                tile = resized_image.crop((left, upper, right, lower))
-                tile_path = os.path.join(level_dir, f"{x}_{y}.jpg")
-                tile.save(tile_path, "PNG", quality=80)
+    # Use multiprocessing to process the tiles in parallel
+    with multiprocessing.Pool() as pool:
+        pool.starmap(generate_tile, tasks)
 
     print(f"Tiles generated in {output_dir}")
